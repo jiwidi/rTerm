@@ -13,7 +13,13 @@ rTerm = function (options) {
     // Starting path in fs
     this.fsstart = options.fsstart || "/home/" + this.username;
     // High of the terminal
-    this.height = options.height || 400;
+    if(options.url.split("/")[4]=="photos"){
+        this.height = 200;
+      }
+    else{
+        this.height = 500;
+
+    }
     // Maximal number of strings
     this.maxStrings = options.maxStrings || 15;
     // Save string to server
@@ -23,7 +29,7 @@ rTerm = function (options) {
     // How much commands should be stored at history
     this.maxHistoryLength = options.maxHistoryLength || 20;
     // How much time might take to print one character [ms]
-    this.chartime = 250;
+    this.chartime = 150;
     // Current dirrectory
     this.cdir = this.fsstart;
     this.uhsername = this.username + '@' + this.hostname;
@@ -47,7 +53,16 @@ rTerm = function (options) {
           };
 
           if (this.data.upstart !== "undefined") {
-              var delay = this.callUpstart();
+              if(options.url.split("/")[4]=="photos"){
+                var delay = this.callPhotos();
+              } else if(options.url.split("/")[4]=="keyboards"){
+                var delay = this.callKeyboard();
+              } else if(options.url.split("/")[4]=="blog"){
+                var delay = this.callBlog();
+              }
+              else {
+                var delay = this.callUpstart(); // Home page
+              }
 
               setTimeout(function() {
                 document.addEventListener("keydown", this.keyCallback);
@@ -63,7 +78,8 @@ rTerm = function (options) {
         this.termPrev + '</span><span class="cursor">&#9608</span></div>';
     };
 
-    this.termPrev = '<b>' + this.uhsername + '</b>:~$  '
+    this.termPrev = '<b>' + this.uhsername + '</b>:' + this.cdir+ '$  '
+    this.termPrev = this.termPrev.replace('/home/jiwidi', '~')
     this.oldInput = ''
     this.input = '';
     this.nStrings = 0;
@@ -93,6 +109,81 @@ rTerm = function (options) {
             }, delay);
         }
         delay += (this.data.upstart[this.data.upstart.length - 1].length + 1) * this.chartime;
+        return delay;
+    };
+
+    this.callPhotos = function () {
+        var delay = 0;
+        this.upcid = 0;
+        this.upstartInterrupted = false;
+
+        for (cid in this.data.startphotos) {
+            if (cid > 0) {
+                delay += (this.data.startphotos[cid - 1].length + 1) * this.chartime;
+            }
+            setTimeout(function() {
+                if (window.blurred && !this.upstartInterrupted) {
+                    this.callUpstartImmediately(this.data.startphotos.slice(this.upcid));
+                    this.upstartInterrupted = true;
+                    return;
+                }
+                else if (!this.upstartInterrupted) {
+                    this.enterCommand(this.data.startphotos[this.upcid]);
+                }
+                this.upcid++;
+            }, delay);
+        }
+        delay += (this.data.startphotos[this.data.startphotos.length - 1].length + 1) * this.chartime;
+        return delay;
+    };
+
+    this.callKeyboard = function () {
+        var delay = 0;
+        this.upcid = 0;
+        this.upstartInterrupted = false;
+
+        for (cid in this.data.startkeyboards) {
+            if (cid > 0) {
+                delay += (this.data.startkeyboards[cid - 1].length + 1) * this.chartime;
+            }
+            setTimeout(function() {
+                if (window.blurred && !this.upstartInterrupted) {
+                    this.callUpstartImmediately(this.data.startkeyboards.slice(this.upcid));
+                    this.upstartInterrupted = true;
+                    return;
+                }
+                else if (!this.upstartInterrupted) {
+                    this.enterCommand(this.data.startkeyboards[this.upcid]);
+                }
+                this.upcid++;
+            }, delay);
+        }
+        delay += (this.data.startkeyboards[this.data.startkeyboards.length - 1].length + 1) * this.chartime;
+        return delay;
+    };
+
+    this.callBlog = function () {
+        var delay = 0;
+        this.upcid = 0;
+        this.upstartInterrupted = false;
+
+        for (cid in this.data.startblog) {
+            if (cid > 0) {
+                delay += (this.data.startblog[cid - 1].length + 1) * this.chartime;
+            }
+            setTimeout(function() {
+                if (window.blurred && !this.upstartInterrupted) {
+                    this.callUpstartImmediately(this.data.startblog.slice(this.upcid));
+                    this.upstartInterrupted = true;
+                    return;
+                }
+                else if (!this.upstartInterrupted) {
+                    this.enterCommand(this.data.startblog[this.upcid]);
+                }
+                this.upcid++;
+            }, delay);
+        }
+        delay += (this.data.startblog[this.data.startblog.length - 1].length + 1) * this.chartime;
         return delay;
     };
 
@@ -137,6 +228,10 @@ rTerm = function (options) {
 
     // Update #termcli with new input
     this.updateTerm = function () {
+        if(this.termPrev.split('$')[0].slice(-1)!="/"){
+            this.termPrev = this.termPrev.split('$')[0]+'/$'+this.termPrev.split('$')[1]
+        }
+        this.termPrev = this.termPrev.replace('/home/jiwidi/', '~/')
         document.getElementById("termcli").innerHTML = this.oldInput + this.termPrev + this.input;
         while (document.getElementById("term").offsetHeight > this.height)
         {
@@ -266,8 +361,6 @@ rTerm = function (options) {
             path = dstname;
         } else if (dstname.startsWith("~")) {
             path = this.fsstart + "/" + dstname.slice(1);
-        } else if (this.cdir == "/") {
-            path = "/" + dstname;
         } else {
             path = this.cdir + "/" + dstname;
         }
@@ -339,6 +432,8 @@ rTerm = function (options) {
                     if (typeof dirData[item] === 'string') {
                         if (dirData[item].startsWith("_link:")) {
                             this.oldInput += '<a class="link" href="' + dirData[item].slice(6, ) + '" target="_blank">' + item + '</a><br>';
+                        } else if (dirData[item].startsWith("_ilink:")) {
+                            this.oldInput += '<a class="link" href="' + dirData[item].slice(7, ) + '" target="_self">' + item + '</a><br>';
                         } else {
                             this.oldInput += item + '<br>';
                         }
@@ -388,10 +483,29 @@ rTerm = function (options) {
     this.cdCallback = (function(args) {
         var dstname = '';
         if (args.length < 2 || args[1] == " ") {
-            dstname = "~";
+            // dstname = "~";
         } else {
             dstname = args[1];
         }
+        if(dstname==".."){
+            aux = this.cdir.split("/").slice();
+            dstname = aux.slice(0, aux.length-1).join("/");
+        }
+        if(dstname=="/home/jiwidi/" & this.cdir!="/home/jiwidi" & this.cdir!="/home/jiwidi/"){
+            window.location.href = '/home/';
+        }
+        // else if(dstname.substr(0,3)=="../"){
+        //     // aux = this.cdir.split("/").slice();
+        //     // dstname = dstname.replace("../",aux.slice(0, aux.length-1).join("/"));
+
+        // }
+        // // Parse ..
+        // aux = this.cdir.split("/")
+        // for (small_path in dstname.split("/")) {
+        //     console.log(dstname.split("/")[small_path])
+
+        //     console.log(aux.slice(small_path+1)[0])
+        // }
         var [data, path] = this.getByPath(dstname);
         if (typeof data === 'undefined') {
             this.oldInput += this.termPrev + this.input + '<br>' + this.input + ": No such file or directory" + '<br>';
@@ -403,7 +517,12 @@ rTerm = function (options) {
                 this.input = '';
                 this.nStrings++;
                 window.open(data.slice(6, ), '_blank').focus();
-            } else {
+            } else if (data.startsWith("_ilink:")) {
+                this.oldInput += this.termPrev + this.input + '<br>';
+                this.input = '';
+                this.nStrings++;
+                window.open(data.slice(7, ), '_self').focus();
+            }else {
                 this.oldInput += this.termPrev + this.input + '<br>' + this.input + ": Not a directory" + '<br>';
                 this.input = '';
                 this.nStrings += 2;
@@ -488,6 +607,7 @@ rTerm = function (options) {
                       + '<br>help [-dms] [pattern ...]'
                       + '<br>time [-p] pipeline'
                       + '<br>times<br>';
+                      + '<br>pepe<br>';
 
         this.input = '';
         this.nStrings += 10;
@@ -656,6 +776,25 @@ rTerm = function (options) {
         this.updateTerm();
     }).bind(this);
 
+    /*
+     * Prints ASCII art with FU logo
+     */
+    this.pepeCallback = (function(args) {
+      this.oldInput += this.termPrev + this.input + '<br>';
+      this.nStrings++;
+
+      for (item of this.data.pepe) {
+          this.oldInput += item + '<br>';
+          this.nStrings++;
+      }
+      this.input = '';
+      this.updateTerm();
+    }).bind(this);
+
+    this.homeCallback = (function(args) {
+        window.location.href = '/home/';
+      }).bind(this);
+
     this.funcMap = {
         "ls": this.lsCallback,
         "cd": this.cdCallback,
@@ -676,7 +815,9 @@ rTerm = function (options) {
         "sudo": this.sudoCallback,
         "apt": this.aptCallback,
         "apt-get": this.aptCallback,
-        "df": this.dfCallback
+        "df": this.dfCallback,
+        "pepe": this.pepeCallback,
+        "home": this.homeCallback
     };
 
     this.init();
